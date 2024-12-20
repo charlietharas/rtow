@@ -5,6 +5,7 @@
 
 *.mhtml
 *.exe
+*.ppm
 
 # User-specific files
 *.rsuser
