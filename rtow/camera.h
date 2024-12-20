@@ -8,25 +8,47 @@
 struct render_params {
 	int samples_per_pixel; // antialiasing
 	int max_recursion_depth; // ray scattering
+	int gamma;
 };
 
 struct camera_params {
-	// TODO;
+	int vfov; // field of view
+	point3 pos; // camera location
+	point3 target; // point camera is looking at (defined rather than angle)
+	point3 up; // vector pointing up from the camera, relative to the camera
+	double focal_length; // set to 0 to use default
 };
 
 class camera {
 public:
 	double aspect_ratio = 1.0;
 	int image_width = 100;
+
 	int samples_per_pixel = 10;
 	int max_recursion_depth = 10;
 	double gamma = 0.25;
+
+	double vfov = 90;
+	point3 pos = point3(0, 0, 0);
+	point3 target = point3(0, 0, -1);
+	vec3 up = vec3(0, 1, 0);
 
 	camera() { init(); }
 	camera(double asp, int imw) : aspect_ratio(asp), image_width(imw) { init(); }
 	camera(double asp, int imw, render_params& params) : aspect_ratio(asp), image_width(imw) {
 		samples_per_pixel = params.samples_per_pixel;
 		max_recursion_depth = params.max_recursion_depth;
+		gamma = params.gamma;
+		init();
+	}
+	camera(double asp, int imw, render_params& rparam, camera_params& cparam) : aspect_ratio(asp), image_width(imw) {
+		samples_per_pixel = rparam.samples_per_pixel;
+		max_recursion_depth = rparam.max_recursion_depth;
+		vfov = cparam.vfov;
+		pos = cparam.pos;
+		target = cparam.target;
+		up = cparam.up;
+		focal_length = cparam.focal_length;
 		init();
 	}
 
@@ -56,30 +78,39 @@ public:
 private:
 	int image_height;
 	double pixel_samples_scale;
-	point3 center;
 	point3 pixel_topleft;
 	vec3 pixel_delta_u;
 	vec3 pixel_delta_v;
+	double focal_length;
+	vec3 u, v, w; // basis vectors for the camera's "world"
 
 	void init() {
 		image_height = int(image_width / aspect_ratio);
-		image_height = (image_height < 1) ? 1 : image_height;
+		if (image_height < 1) {
+			std::cerr << "Warning: image height <1px, are you sure you have the correct width and aspect ratio?" << std::endl;
+		}
+		image_height = std::max(image_height, 1);
 
 		pixel_samples_scale = 1.0 / samples_per_pixel;
 
-		center = point3(0, 0, 0);
-
-		double focal_length = 1.0;
-		double viewport_height = 2.0;
+		if (focal_length == 0) {
+			focal_length = (pos - target).length();
+		}
+		double h = std::tan(deg_to_rad(vfov) / 2);
+		double viewport_height = 2 * h * focal_length;
 		double viewport_width = viewport_height * (double(image_width) / image_height);
 
-		vec3 viewport_u = vec3(viewport_width, 0, 0);
-		vec3 viewport_v = vec3(0, -viewport_height, 0);
+		w = unit(pos - target);
+		u = unit(cross(up, w));
+		v = cross(w, u);
+
+		vec3 viewport_u = viewport_width * u;
+		vec3 viewport_v = viewport_height * -v;
 
 		pixel_delta_u = viewport_u / image_width;
 		pixel_delta_v = viewport_v / image_height;
 
-		vec3 viewport_topleft = center - vec3(0, 0, focal_length) - viewport_u / 2 - viewport_v / 2;
+		vec3 viewport_topleft = pos - (focal_length * w) - viewport_u / 2 - viewport_v / 2;
 		pixel_topleft = viewport_topleft + (pixel_delta_u + pixel_delta_v) / 2;
 	}
 
@@ -87,10 +118,9 @@ private:
 		vec3 offset = sample_square();
 		vec3 pixel_sample = pixel_topleft + ((i + offset.x()) * pixel_delta_u) + ((j + offset.y()) * pixel_delta_v);
 
-		vec3 origin = center;
-		vec3 direction = pixel_sample - origin;
+		vec3 direction = pixel_sample - pos;
 
-		return ray(origin, direction);
+		return ray(pos, direction);
 	}
 
 	vec3 sample_square() const {

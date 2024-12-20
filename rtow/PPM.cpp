@@ -31,8 +31,9 @@ int main() {
 	// camera
 	double aspect_ratio = 16.0 / 9.0;
 	int image_width = 400;
-	render_params rp{ 10, 20 };
-	camera cam(aspect_ratio, image_width, rp);
+	render_params renp{ 10, 20 };
+	camera_params camp{ 90, point3(-2, 2, 1), point3(0, 0, -1), vec3(0, 1, 0) };
+	camera cam(aspect_ratio, image_width, renp, camp);
 	
 	// tasks
 	cam.render(scene);
