@@ -6,8 +6,8 @@
 #include <fstream>
 
 struct render_params {
-	int samples_per_pixel; // antialiasing
-	int max_recursion_depth; // ray scattering
+	int samples_per_pixel; // set to 1 to disable; antialiasing (supersampling/SSAA)
+	int max_recursion_depth; // how many times rays are allowed to scatter before being ignored
 	int gamma;
 };
 
@@ -67,13 +67,27 @@ public:
 		for (int j = 0; j < image_height; j++) {
 			std::clog << "\r" << std::round(double(j) / image_height * 100 * 10) / 10 << '%' << std::flush;
 			for (int i = 0; i < image_width; i++) {
+				int spp = samples_per_pixel;
 				color pixel(0, 0, 0);
 				// anti-aliasing
-				for (int sample = 0; sample < samples_per_pixel; sample++) {
-					ray r = get_ray(i, j);
-					pixel += ray_color(r, scene);
+				if (samples_per_pixel > 1) {
+					for (int sample = 0; sample < samples_per_pixel; sample++) {
+						ray r = get_ray(i, j);
+						color diff = ray_color(r, scene);
+						if (diff.length() == 0) {
+							spp--;
+						}
+						pixel += diff;
+					}
 				}
-				write_color(outfile, pixel_samples_scale * pixel);
+				else {
+					point3 pixel_center = pixel_topleft + i * pixel_delta_u + j * pixel_delta_v;
+					vec3 dir = pixel_center - pos;
+
+					pixel = ray_color(ray(pos, dir), scene);
+				}
+				spp = spp > 0 ? spp : 0;
+				write_color(outfile, pixel / spp);
 			}
 		}
 
@@ -84,7 +98,6 @@ public:
 
 private:
 	int image_height;
-	double pixel_samples_scale;
 	point3 pixel_topleft;
 	vec3 pixel_delta_u;
 	vec3 pixel_delta_v;
@@ -98,8 +111,6 @@ private:
 			std::cerr << "Warning: image height <1px, are you sure you have the correct width and aspect ratio?" << std::endl;
 		}
 		image_height = std::max(image_height, 1);
-
-		pixel_samples_scale = 1.0 / samples_per_pixel;
 
 		if (focal_length == 0) {
 			focal_length = (pos - target).length();
