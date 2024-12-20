@@ -33,7 +33,6 @@ public:
 		rec.t = root;
 		rec.p = r.at(rec.t);
 		rec.set_face(r, (rec.p - center) / radius);
-		rec.normal = (rec.p - center) / radius;
 
 		return true;
 	}

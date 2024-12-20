@@ -68,7 +68,6 @@ public:
 			dir = reflect(ud, rec.normal);
 		}
 		else {
-			// TODO refraction is broken
 			dir = refract(ud, rec.normal, refri);
 		}
 
