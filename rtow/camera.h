@@ -17,6 +17,8 @@ struct camera_params {
 	point3 target; // point camera is looking at (defined rather than angle)
 	point3 up; // vector pointing up from the camera, relative to the camera
 	double focal_length; // set to 0 to use default
+	double defocus_angle; // set to 0 to disable depth of field; variation of angle rays thru each pixel
+	double focus_dist; // distance from camera to focus plane (with above, defines a cone of focus)
 };
 
 class camera {
@@ -32,6 +34,9 @@ public:
 	point3 pos = point3(0, 0, 0);
 	point3 target = point3(0, 0, -1);
 	vec3 up = vec3(0, 1, 0);
+
+	double defocus_angle = 0;
+	double focus_dist = 0;
 
 	camera() { init(); }
 	camera(double asp, int imw) : aspect_ratio(asp), image_width(imw) { init(); }
@@ -49,6 +54,8 @@ public:
 		target = cparam.target;
 		up = cparam.up;
 		focal_length = cparam.focal_length;
+		defocus_angle = cparam.defocus_angle;
+		focus_dist = cparam.focus_dist;
 		init();
 	}
 
@@ -83,6 +90,7 @@ private:
 	vec3 pixel_delta_v;
 	double focal_length;
 	vec3 u, v, w; // basis vectors for the camera's "world"
+	vec3 defocus_u, defocus_v;
 
 	void init() {
 		image_height = int(image_width / aspect_ratio);
@@ -97,6 +105,9 @@ private:
 			focal_length = (pos - target).length();
 		}
 		double h = std::tan(deg_to_rad(vfov) / 2);
+		if (defocus_angle > 0) {
+			focal_length = focus_dist;
+		}
 		double viewport_height = 2 * h * focal_length;
 		double viewport_width = viewport_height * (double(image_width) / image_height);
 
@@ -112,15 +123,30 @@ private:
 
 		vec3 viewport_topleft = pos - (focal_length * w) - viewport_u / 2 - viewport_v / 2;
 		pixel_topleft = viewport_topleft + (pixel_delta_u + pixel_delta_v) / 2;
+
+		if (defocus_angle > 0) {
+			double defocus_radius = focus_dist * std::tan(deg_to_rad(defocus_angle / 2));
+			defocus_u = u * defocus_radius;
+			defocus_v = v * defocus_radius;
+		}
 	}
 
 	ray get_ray(int i, int j) const {
 		vec3 offset = sample_square();
 		vec3 pixel_sample = pixel_topleft + ((i + offset.x()) * pixel_delta_u) + ((j + offset.y()) * pixel_delta_v);
 
-		vec3 direction = pixel_sample - pos;
+		vec3 origin = pos;
+		if (defocus_angle > 0) {
+			origin = defocus_disk_sample();
+		}
+		vec3 direction = pixel_sample - origin;
 
-		return ray(pos, direction);
+		return ray(origin, direction);
+	}
+
+	vec3 defocus_disk_sample() const {
+		vec3 p = random_on_disk();
+		return pos + p[0] * defocus_u + p[1] * defocus_v;
 	}
 
 	vec3 sample_square() const {
