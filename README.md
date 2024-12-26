@@ -1,4 +1,4 @@
-Simply followed along with [this fantastic guide](https://raytracing.github.io/books/RayTracingInOneWeekend.html#antialiasing) by Peter Shirley!
+Simply followed along with [this fantastic guide](https://raytracing.github.io/books/RayTracingInOneWeekend.html) by Peter Shirley!
 
 Currently (12/19/24) doesn't contain any substantial differences, but I'm hoping to make lots of my own changes (!), as I learn from Parallel Processing this semester.
 - Will check out [the next part](https://raytracing.github.io/books/RayTracingTheNextWeek.html)
